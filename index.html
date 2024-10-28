@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Notepad</title>
+    <style>
+        /* Basic styling */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1c1c1c; /* Dark background */
+            color: #f5f5f5; /* Light text */
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: 40px auto;
+            padding: 20px;
+            background: #2a2a2a; /* Darker container */
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .add-note {
+            display: block;
+            margin: 0 auto 20px auto;
+            padding: 10px 15px;
+            background: #007BFF; /* Blue button */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .notes {
+            margin-top: 20px;
+        }
+
+        .note {
+            background: #3c3c3c; /* Note background */
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007BFF; /* Blue left border */
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #b0b0b0; /* Light gray */
+        }
+
+        .note-actions {
+            margin-top: 10px;
+        }
+
+        .edit-note,
+        .delete-note {
+            margin-right: 10px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .edit-note {
+            background: #FFC107; /* Yellow edit button */
+            color: white;
+        }
+
+        .edit-note:hover {
+            background: #e0a800; /* Darker yellow */
+        }
+
+        .delete-note {
+            background: #DC3545; /* Red delete button */
+            color: white;
+        }
+
+        .delete-note:hover {
+            background: #c82333; /* Darker red */
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.8); /* Dark overlay */
+        }
+
+        .modal-content {
+            background-color: #2a2a2a; /* Modal background */
+            margin: 15% auto; 
+            padding: 20px;
+            border: 1px solid #888;
+            width: 60%; 
+            border-radius: 10px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: white; /* White close button */
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        input[type=text], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 20px 0;
+            border: 1px solid #444; /* Dark border */
+            border-radius: 5px;
+            background-color: #3c3c3c; /* Dark input field */
+            color: white; /* Light text in input */
+        }
+
+        /* Search bar */
+        #search {
+            width: calc(100% - 40px);
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            color: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        /* Button hover effect */
+        button:hover {
+            background-color: #0056b3; /* Darker blue */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Flask Notepad</h1>
+        
+        <!-- Search Bar -->
+        <input type="text" id="search" placeholder="Search notes..." oninput="searchNotes()" value="{{ search_query }}">
+        <button class="add-note" onclick="openAddNoteModal()">+ Add Note</button>
+
+        <!-- Notes Display -->
+        <div class="notes">
+            {% for note in notes %}
+                <div class="note">
+                    <h3>{{ note.title }}</h3>
+                    <p>{{ note.content }}</p>
+                    <small class="timestamp">{{ note.timestamp }}</small>
+                    <div class="note-actions">
+                        <button class="edit-note" onclick="setEditNote({{ loop.index0 }})">Edit</button>
+                        <a class="delete-note" href="{{ url_for('delete_note', note_id=loop.index0) }}">Delete</a>
+                    </div>
+                    <div class="tags">Tags: {% for tag in note.tags %}{{ tag }} {% endfor %}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Add Note Modal -->
+    <div id="addNoteModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddNoteModal()">&times;</span>
+            <h2>Add Note</h2>
+            <form action="/add_note" method="POST">
+                <label for="note_title">Title:</label>
+                <input type="text" name="note_title" required>
+                <label for="note_content">Content:</label>
+                <textarea name="note_content" required></textarea>
+                <label for="note_tags">Tags (comma-separated):</label>
+                <input type="text" name="note_tags" placeholder="e.g., Work, Personal">
+                <button type="submit">Add Note</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Note Modal -->
+    <div id="editNoteModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditNoteModal()">&times;</span>
+            <h2>Edit Note</h2>
+            <form id="editNoteForm" method="POST">
+                <label for="edit_note_title">Title:</label>
+                <input type="text" id="edit_note_title" name="note_title" required>
+                <label for="edit_note_content">Content:</label>
+                <textarea id="edit_note_content" name="note_content" required></textarea>
+                <label for="edit_note_tags">Tags (comma-separated):</label>
+                <input type="text" id="edit_note_tags" name="note_tags">
+                <button type="submit">Update Note</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openAddNoteModal() {
+            document.getElementById('addNoteModal').style.display = 'block';
+        }
+
+        function closeAddNoteModal() {
+            document.getElementById('addNoteModal').style.display = 'none';
+        }
+
+        function setEditNote(index) {
+            const note = {{ notes|tojson }};
+            document.getElementById('edit_note_title').value = note[index].title;
+            document.getElementById('edit_note_content').value = note[index].content;
+            document.getElementById('edit_note_tags').value = note[index].tags.join(', ');
+            document.getElementById('editNoteForm').action = "/edit_note/" + index;
+            document.getElementById('editNoteModal').style.display = 'block';
+        }
+
+        function closeEditNoteModal() {
+            document.getElementById('editNoteModal').style.display = 'none';
+        }
+
+        function searchNotes() {
+            const searchInput = document.getElementById('search').value;
+            window.location.href = "/?search=" + encodeURIComponent(searchInput);
+        }
+    </script>
+</body>
+</html>
